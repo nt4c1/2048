@@ -25,7 +25,7 @@ class Game2048Screen extends StatefulWidget {
   _Game2048ScreenState createState() => _Game2048ScreenState();
 }
 
-class _Game2048ScreenState extends State<Game2048Screen> {
+class _Game2048ScreenState extends State<Game2048Screen> with TickerProviderStateMixin {
   late Game2048 game;
   String playerName = '';
   String country = '';
@@ -97,6 +97,62 @@ class _Game2048ScreenState extends State<Game2048Screen> {
     );
   }
 
+  Widget buildTile(int value) {
+    return AnimatedContainer(
+      duration: Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      margin: EdgeInsets.all(4),
+      width: 80,
+      height: 80,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: value == 0 ? Colors.grey[300] : _getTileColor(value),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: AnimatedOpacity(
+        opacity: value == 0 ? 0.0 : 1.0,
+        duration: Duration(milliseconds: 200),
+        child: Text(
+          value == 0 ? '' : '$value',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getTileColor(int value) {
+    switch (value) {
+      case 2:
+        return Colors.orange[100]!;
+      case 4:
+        return Colors.orange[200]!;
+      case 8:
+        return Colors.orange[300]!;
+      case 16:
+        return Colors.orange[400]!;
+      case 32:
+        return Colors.orange[500]!;
+      case 64:
+        return Colors.orange[600]!;
+      case 128:
+        return Colors.orange[700]!;
+      case 256:
+        return Colors.orange[800]!;
+      case 512:
+        return Colors.orange[900]!;
+      case 1024:
+        return Colors.redAccent;
+      case 2048:
+        return Colors.red;
+      default:
+        return Colors.grey[300]!;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -140,28 +196,7 @@ class _Game2048ScreenState extends State<Game2048Screen> {
                 children: game.grid
                     .map((row) => Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: row.map((value) {
-                    return Container(
-                      margin: EdgeInsets.all(4),
-                      width: 80,
-                      height: 80,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: value == 0
-                            ? Colors.grey[300]
-                            : Colors.orangeAccent,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        value == 0 ? '' : '$value',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                  children: row.map((value) => buildTile(value)).toList(),
                 ))
                     .toList(),
               ),
