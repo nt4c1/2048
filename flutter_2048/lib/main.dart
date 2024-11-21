@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'game_logic.dart';
 import 'country_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // Initialize Firebase
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(Game2048App());
 }
 
@@ -13,7 +14,7 @@ class Game2048App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '2048',
+      title: '2048 Game',
       theme: ThemeData(primarySwatch: Colors.blue),
       home: Game2048Screen(),
     );
@@ -27,60 +28,18 @@ class Game2048Screen extends StatefulWidget {
 
 class _Game2048ScreenState extends State<Game2048Screen> {
   late Game2048 game;
-  String playerName = '';
-  String country = '';
-  bool isLoading = false;
+  String country = 'Fetching...';
 
   @override
   void initState() {
     super.initState();
     game = Game2048(gridSize: 4);
+    fetchCountry();
   }
 
-  void handleGameOver() async {
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Game Over!'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Score: ${game.score}'),
-            TextField(
-              onChanged: (value) {
-                playerName = value;
-              },
-              decoration: InputDecoration(labelText: 'Enter your name'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              setState(() {
-                isLoading = true;
-              });
-
-              // Fetch country
-              country = await CountryService.fetchCountry();
-
-              // Save data to Firebase
-              await CountryService.saveToFirebase(playerName, game.score, country);
-
-              setState(() {
-                isLoading = false;
-              });
-
-              // Reset the game
-              game.resetGame();
-              setState(() {});
-            },
-            child: Text('Submit'),
-          ),
-        ],
-      ),
-    );
+  Future<void> fetchCountry() async {
+    country = await CountryService.fetchCountry();
+    setState(() {});
   }
 
   void handleSwipe(DragEndDetails details, Offset velocity) {
@@ -104,11 +63,65 @@ class _Game2048ScreenState extends State<Game2048Screen> {
     }
   }
 
+  void handleGameOver() async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Game Over!'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Score: ${game.score}'),
+            TextField(
+              onChanged: (value) {
+                setState(() {
+                  country = value;
+                });
+              },
+              decoration: InputDecoration(labelText: 'Enter your name'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              game.resetGame();
+              setState(() {});
+            },
+            child: Text('Restart'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildTile(int value) {
+    return Container(
+      margin: EdgeInsets.all(4),
+      width: 80,
+      height: 80,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: value == 0 ? Colors.grey[300] : Colors.orangeAccent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        value == 0 ? '' : '$value',
+        style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('2048 Game'),
+        title: Text('2048 - Country: $country'),
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),
@@ -119,51 +132,18 @@ class _Game2048ScreenState extends State<Game2048Screen> {
           ),
         ],
       ),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : Column(
-        children: [
-          SizedBox(height: 16),
-          Text(
-            'Score: ${game.score}',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onPanEnd: (details) =>
-                  handleSwipe(details, details.velocity.pixelsPerSecond),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: game.grid
-                    .map((row) => Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: row.map((value) {
-                    return Container(
-                      margin: EdgeInsets.all(4),
-                      width: 80,
-                      height: 80,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: value == 0
-                            ? Colors.grey[300]
-                            : Colors.orangeAccent,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        value == 0 ? '' : '$value',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ))
-                    .toList(),
-              ),
-            ),
-          ),
-        ],
+      body: GestureDetector(
+        onPanEnd: (details) =>
+            handleSwipe(details, details.velocity.pixelsPerSecond),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: game.grid.map((row) {
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: row.map((value) => buildTile(value)).toList(),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
