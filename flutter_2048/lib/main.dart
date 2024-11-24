@@ -30,18 +30,50 @@ class Game2048Screen extends StatefulWidget {
 class _Game2048ScreenState extends State<Game2048Screen> {
   late Game2048 game;
   String country = 'Fetching...';
-  String playerName = '';
+  bool isRestricted = false; // To track restricted countries
+  final List<String> restrictedCountries = ['my', 'sg', 'au', 'id']; // Restricted countries
 
   @override
   void initState() {
     super.initState();
     game = Game2048(gridSize: 4);
-    fetchCountry();
+    fetchCountryAndHandleRestriction();
   }
 
-  Future<void> fetchCountry() async {
-    country = await CountryService.fetchCountry();
-    setState(() {});
+  Future<void> fetchCountryAndHandleRestriction() async {
+    try {
+      country = await CountryService.fetchCountry();
+      print('Fetched country: $country'); // Debug log
+
+      // Check if the country is restricted
+      setState(() {
+        isRestricted = restrictedCountries.contains(country.toLowerCase());
+      });
+
+      if (isRestricted) {
+        await setNullInFirebase(country);
+      }
+    } catch (e) {
+      print('Error fetching country or handling restriction: $e');
+      setState(() {
+        country = 'Unknown';
+        isRestricted = false; // Allow game if country cannot be fetched
+      });
+    }
+  }
+
+  Future<void> setNullInFirebase(String country) async {
+    try {
+      await FirebaseFirestore.instance.collection('players').add({
+        'name': null,
+        'score': null,
+        'country': country,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+      print('Player data set to NULL for restricted country.');
+    } catch (e) {
+      print('Error saving NULL player data: $e');
+    }
   }
 
   void handleSwipe(DragEndDetails details, Offset velocity) {
@@ -77,7 +109,7 @@ class _Game2048ScreenState extends State<Game2048Screen> {
             TextField(
               onChanged: (value) {
                 setState(() {
-                  playerName = value;
+                  // Update player name here if needed
                 });
               },
               decoration: InputDecoration(labelText: 'Enter your name'),
@@ -86,35 +118,16 @@ class _Game2048ScreenState extends State<Game2048Screen> {
         ),
         actions: [
           TextButton(
-            onPressed: () async {
+            onPressed: () {
               Navigator.of(context).pop();
-
-              // Save data to Firestore
-              await saveToFirestore(playerName, game.score, country);
-
-              // Reset the game after submission
               game.resetGame();
               setState(() {});
             },
-            child: Text('Submit'),
+            child: Text('Restart'),
           ),
         ],
       ),
     );
-  }
-
-  Future<void> saveToFirestore(String name, int score, String country) async {
-    try {
-      await FirebaseFirestore.instance.collection('players').add({
-        'name': name,
-        'score': score,
-        'country': country,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-      print('Player data saved to Firestore.');
-    } catch (e) {
-      print('Error saving player data: $e');
-    }
   }
 
   Widget buildTile(int value) {
@@ -171,6 +184,19 @@ class _Game2048ScreenState extends State<Game2048Screen> {
 
   @override
   Widget build(BuildContext context) {
+    // Show "NULL" screen for restricted countries
+    if (isRestricted) {
+      return Scaffold(
+        body: Center(
+          child: Text(
+            'NULL',
+            style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
+    }
+
+    // Show game screen for non-restricted countries
     return Scaffold(
       appBar: AppBar(
         title: Text('2048 - Country: $country'),
